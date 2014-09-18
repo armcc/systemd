@@ -319,6 +319,7 @@ AC_CHECK_DECLS([
         pivot_root,
         canonicalize_file_name,
         name_to_handle_at,
+        strndupa,
         setns,
         getrandom,
         renameat2,
@@ -328,6 +329,7 @@ AC_CHECK_DECLS([
         copy_file_range],
         [], [], [[
 #include <stdlib.h>
+#include <string.h>
 #include <sys/types.h>
 #include <unistd.h>
 #include <sys/mount.h>

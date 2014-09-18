@@ -20,6 +20,7 @@
 #include "alloc-util.h"
 #include "hexdecoct.h"
 #include "macro.h"
+#include "missing.h"
 #include "string-util.h"
 
 static void test_hexchar(void) {

@@ -32,6 +32,7 @@
 #include "locale-util.h"
 #include "log.h"
 #include "macro.h"
+#include "missing.h"
 #include "pager.h"
 #include "process-util.h"
 #include "signal-util.h"

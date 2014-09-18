@@ -22,6 +22,7 @@
 #include <string.h>
 
 #include "macro.h"
+#include "missing.h"
 #include "uid-range.h"
 #include "user-util.h"
 
