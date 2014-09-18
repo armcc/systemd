@@ -1019,4 +1019,10 @@ typedef int32_t key_serial_t;
 #define exp10(x) (exp((x) * log(10)))
 #endif /* __UCLIBC__ */
 
+#ifndef __COMPAR_FN_T
+#define __COMPAR_FN_T
+typedef int (*__compar_fn_t)(const void *, const void *);
+typedef __compar_fn_t comparison_fn_t;
+#endif
+
 #include "missing_syscall.h"
