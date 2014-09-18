@@ -317,6 +317,7 @@ AC_CHECK_DECLS([
         memfd_create,
         gettid,
         pivot_root,
+        canonicalize_file_name,
         name_to_handle_at,
         setns,
         getrandom,
@@ -326,6 +327,7 @@ AC_CHECK_DECLS([
         LO_FLAGS_PARTSCAN,
         copy_file_range],
         [], [], [[
+#include <stdlib.h>
 #include <sys/types.h>
 #include <unistd.h>
 #include <sys/mount.h>
