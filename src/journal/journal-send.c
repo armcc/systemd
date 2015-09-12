@@ -19,11 +19,12 @@
 
 #include <errno.h>
 #include <fcntl.h>
-#include <printf.h>
 #include <stddef.h>
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <unistd.h>
+
+#include "parse-printf-format.h"
 
 #define SD_JOURNAL_SUPPRESS_LOCATION
 
