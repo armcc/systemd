@@ -19,6 +19,7 @@
 
 #include <net/if.h>
 #include <sys/ioctl.h>
+#include <netinet/if_ether.h>
 #include <linux/ethtool.h>
 #include <linux/sockios.h>
 
