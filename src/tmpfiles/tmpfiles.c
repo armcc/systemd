@@ -1109,17 +1109,31 @@ static int item_do_children(Item *i, const char *path, action_t action) {
 
 static int glob_item(Item *i, action_t action, bool recursive) {
         _cleanup_globfree_ glob_t g = {
+#ifdef GLOB_ALTDIRFUNC
+                /*
+                   If GLOB_ALTDIRFUNC is set, glibc's glob allows the normal
+                   file access functions to be over-ridden. Other libcs (e.g.
+                   musl) do not. As a temporary hack, just remove the custom
+                   file access functions and fall back to the defaults.
+                   Fixme: At least one of the over-rides (opendir_nomod) is a
+                   custom local function. Not using it may have side effects.
+                */
                 .gl_closedir = (void (*)(void *)) closedir,
                 .gl_readdir = (struct dirent *(*)(void *)) readdir,
                 .gl_opendir = (void *(*)(const char *)) opendir_nomod,
                 .gl_lstat = lstat,
                 .gl_stat = stat,
+#endif
         };
         int r = 0, k;
         char **fn;
 
         errno = 0;
+#ifdef GLOB_ALTDIRFUNC
         k = glob(i->path, GLOB_NOSORT|GLOB_BRACE|GLOB_ALTDIRFUNC, NULL, &g);
+#else
+        k = glob(i->path, GLOB_NOSORT|GLOB_BRACE, NULL, &g);
+#endif
         if (k != 0 && k != GLOB_NOMATCH)
                 return log_error_errno(errno ?: EIO, "glob(%s) failed: %m", i->path);
 
