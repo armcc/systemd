@@ -4914,8 +4914,9 @@ test_nss_LDADD = \
 	libsystemd-internal.la \
 	-ldl
 
-manual_tests += \
-	test-nss
+# No nss support with musl, disable test-nss
+# manual_tests += \
+#	test-nss
 
 # ------------------------------------------------------------------------------
 if HAVE_MYHOSTNAME
