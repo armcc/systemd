@@ -17,8 +17,8 @@
   along with systemd; If not, see <http://www.gnu.org/licenses/>.
 ***/
 
+#include <unistd.h>
 #include <sys/reboot.h>
-#include <sys/unistd.h>
 #include <sys/wait.h>
 
 #include "fd-util.h"

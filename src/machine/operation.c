@@ -17,6 +17,8 @@
   along with systemd; If not, see <http://www.gnu.org/licenses/>.
 ***/
 
+#include <wait.h>
+
 #include "alloc-util.h"
 #include "fd-util.h"
 #include "operation.h"
