@@ -64,6 +64,7 @@
 #include "unit-name.h"
 #include "unit-printf.h"
 #include "unit.h"
+#include "user-util.h"
 #include "utf8.h"
 #include "web-util.h"
 
@@ -625,20 +626,28 @@ int config_parse_exec(
 
                 if (isempty(f)) {
                         /* First word is either "-" or "@" with no command. */
-                        log_syntax(unit, LOG_ERR, filename, line, 0, "Empty path in command line, ignoring: \"%s\"", rvalue);
-                        return 0;
+                        log_syntax(unit, LOG_ERR, filename, line, 0,
+                                   "Empty path in command line%s: \"%s\"",
+                                   ignore ? ", ignoring" : "", rvalue);
+                        return ignore ? 0 : -ENOEXEC;
                 }
                 if (!string_is_safe(f)) {
-                        log_syntax(unit, LOG_ERR, filename, line, 0, "Executable path contains special characters, ignoring: %s", rvalue);
-                        return 0;
+                        log_syntax(unit, LOG_ERR, filename, line, 0,
+                                   "Executable path contains special characters%s: %s",
+                                   ignore ? ", ignoring" : "", rvalue);
+                        return ignore ? 0 : -ENOEXEC;
                 }
                 if (!path_is_absolute(f)) {
-                        log_syntax(unit, LOG_ERR, filename, line, 0, "Executable path is not absolute, ignoring: %s", rvalue);
-                        return 0;
+                        log_syntax(unit, LOG_ERR, filename, line, 0,
+                                   "Executable path is not absolute%s: %s",
+                                   ignore ? ", ignoring" : "", rvalue);
+                        return ignore ? 0 : -ENOEXEC;
                 }
                 if (endswith(f, "/")) {
-                        log_syntax(unit, LOG_ERR, filename, line, 0, "Executable path specifies a directory, ignoring: %s", rvalue);
-                        return 0;
+                        log_syntax(unit, LOG_ERR, filename, line, 0,
+                                   "Executable path specifies a directory%s: %s",
+                                   ignore ? ", ignoring" : "", rvalue);
+                        return ignore ? 0 : -ENOEXEC;
                 }
 
                 if (f == firstword) {
@@ -694,7 +703,7 @@ int config_parse_exec(
                         if (r == 0)
                                 break;
                         else if (r < 0)
-                                return 0;
+                                return ignore ? 0 : -ENOEXEC;
 
                         if (!GREEDY_REALLOC(n, nbufsize, nlen + 2))
                                 return log_oom();
@@ -704,8 +713,10 @@ int config_parse_exec(
                 }
 
                 if (!n || !n[0]) {
-                        log_syntax(unit, LOG_ERR, filename, line, 0, "Empty executable name or zeroeth argument, ignoring: %s", rvalue);
-                        return 0;
+                        log_syntax(unit, LOG_ERR, filename, line, 0,
+                                   "Empty executable name or zeroeth argument%s: %s",
+                                   ignore ? ", ignoring" : "", rvalue);
+                        return ignore ? 0 : -ENOEXEC;
                 }
 
                 nce = new0(ExecCommand, 1);
@@ -1213,8 +1224,10 @@ int config_parse_exec_selinux_context(
 
         r = unit_name_printf(u, rvalue, &k);
         if (r < 0) {
-                log_syntax(unit, LOG_ERR, filename, line, r, "Failed to resolve specifiers, ignoring: %m");
-                return 0;
+                log_syntax(unit, LOG_ERR, filename, line, r,
+                           "Failed to resolve specifiers%s: %m",
+                           ignore ? ", ignoring" : "");
+                return ignore ? 0 : -ENOEXEC;
         }
 
         free(c->selinux_context);
@@ -1261,8 +1274,10 @@ int config_parse_exec_apparmor_profile(
 
         r = unit_name_printf(u, rvalue, &k);
         if (r < 0) {
-                log_syntax(unit, LOG_ERR, filename, line, r, "Failed to resolve specifiers, ignoring: %m");
-                return 0;
+                log_syntax(unit, LOG_ERR, filename, line, r,
+                           "Failed to resolve specifiers%s: %m",
+                           ignore ? ", ignoring" : "");
+                return ignore ? 0 : -ENOEXEC;
         }
 
         free(c->apparmor_profile);
@@ -1309,8 +1324,10 @@ int config_parse_exec_smack_process_label(
 
         r = unit_name_printf(u, rvalue, &k);
         if (r < 0) {
-                log_syntax(unit, LOG_ERR, filename, line, r, "Failed to resolve specifiers, ignoring: %m");
-                return 0;
+                log_syntax(unit, LOG_ERR, filename, line, r,
+                           "Failed to resolve specifiers%s: %m",
+                           ignore ? ", ignoring" : "");
+                return ignore ? 0 : -ENOEXEC;
         }
 
         free(c->smack_process_label);
@@ -1519,19 +1536,19 @@ int config_parse_socket_service(
 
         r = unit_name_printf(UNIT(s), rvalue, &p);
         if (r < 0) {
-                log_syntax(unit, LOG_ERR, filename, line, r, "Failed to resolve specifiers, ignoring: %s", rvalue);
-                return 0;
+                log_syntax(unit, LOG_ERR, filename, line, r, "Failed to resolve specifiers: %s", rvalue);
+                return -ENOEXEC;
         }
 
         if (!endswith(p, ".service")) {
-                log_syntax(unit, LOG_ERR, filename, line, 0, "Unit must be of type service, ignoring: %s", rvalue);
-                return 0;
+                log_syntax(unit, LOG_ERR, filename, line, 0, "Unit must be of type service: %s", rvalue);
+                return -ENOEXEC;
         }
 
         r = manager_load_unit(UNIT(s)->manager, p, NULL, &error, &x);
         if (r < 0) {
-                log_syntax(unit, LOG_ERR, filename, line, r, "Failed to load unit %s, ignoring: %s", rvalue, bus_error_message(&error, r));
-                return 0;
+                log_syntax(unit, LOG_ERR, filename, line, r, "Failed to load unit %s: %s", rvalue, bus_error_message(&error, r));
+                return -ENOEXEC;
         }
 
         unit_ref_set(&s->service, x);
@@ -1758,6 +1775,123 @@ int config_parse_sec_fix_0(
         return 0;
 }
 
+int config_parse_user_group(
+                const char *unit,
+                const char *filename,
+                unsigned line,
+                const char *section,
+                unsigned section_line,
+                const char *lvalue,
+                int ltype,
+                const char *rvalue,
+                void *data,
+                void *userdata) {
+
+        char **user = data, *n;
+        Unit *u = userdata;
+        int r;
+
+        assert(filename);
+        assert(lvalue);
+        assert(rvalue);
+        assert(u);
+
+        if (isempty(rvalue))
+                n = NULL;
+        else {
+                _cleanup_free_ char *k = NULL;
+
+                r = unit_full_printf(u, rvalue, &k);
+                if (r < 0) {
+                        log_syntax(unit, LOG_ERR, filename, line, r, "Failed to resolve unit specifiers in %s: %m", rvalue);
+                        return -ENOEXEC;
+                }
+
+                if (!valid_user_group_name_or_id(k)) {
+                        log_syntax(unit, LOG_ERR, filename, line, 0, "Invalid user/group name or numeric ID: %s", k);
+                        return -ENOEXEC;
+                }
+
+                n = k;
+                k = NULL;
+        }
+
+        free(*user);
+        *user = n;
+
+        return 0;
+}
+
+int config_parse_user_group_strv(
+                const char *unit,
+                const char *filename,
+                unsigned line,
+                const char *section,
+                unsigned section_line,
+                const char *lvalue,
+                int ltype,
+                const char *rvalue,
+                void *data,
+                void *userdata) {
+
+        char ***users = data;
+        Unit *u = userdata;
+        const char *p;
+        int r;
+
+        assert(filename);
+        assert(lvalue);
+        assert(rvalue);
+        assert(u);
+
+        if (isempty(rvalue)) {
+                char **empty;
+
+                empty = new0(char*, 1);
+                if (!empty)
+                        return log_oom();
+
+                strv_free(*users);
+                *users = empty;
+
+                return 0;
+        }
+
+        p = rvalue;
+        for (;;) {
+                _cleanup_free_ char *word = NULL, *k = NULL;
+
+                r = extract_first_word(&p, &word, WHITESPACE, 0);
+                if (r == 0)
+                        break;
+                if (r == -ENOMEM)
+                        return log_oom();
+                if (r < 0) {
+                        log_syntax(unit, LOG_ERR, filename, line, r, "Invalid syntax: %s", rvalue);
+                        return -ENOEXEC;
+                }
+
+                r = unit_full_printf(u, word, &k);
+                if (r < 0) {
+                        log_syntax(unit, LOG_ERR, filename, line, r, "Failed to resolve unit specifiers in %s: %m", word);
+                        return -ENOEXEC;
+                }
+
+                if (!valid_user_group_name_or_id(k)) {
+                        log_syntax(unit, LOG_ERR, filename, line, 0, "Invalid user/group name or numeric ID: %s", k);
+                        return -ENOEXEC;
+                }
+
+                r = strv_push(users, k);
+                if (r < 0)
+                        return log_oom();
+
+                k = NULL;
+        }
+
+        return 0;
+}
+
 int config_parse_busname_service(
                 const char *unit,
                 const char *filename,
@@ -1904,20 +2038,24 @@ int config_parse_working_directory(
 
                 r = unit_full_printf(u, rvalue, &k);
                 if (r < 0) {
-                        log_syntax(unit, LOG_ERR, filename, line, r, "Failed to resolve unit specifiers in working directory path '%s', ignoring: %m", rvalue);
-                        return 0;
+                        log_syntax(unit, LOG_ERR, filename, line, r,
+                                   "Failed to resolve unit specifiers in working directory path '%s'%s: %m",
+                                   rvalue, missing_ok ? ", ignoring" : "");
+                        return missing_ok ? 0 : -ENOEXEC;
                 }
 
                 path_kill_slashes(k);
 
                 if (!utf8_is_valid(k)) {
                         log_syntax_invalid_utf8(unit, LOG_ERR, filename, line, rvalue);
-                        return 0;
+                        return missing_ok ? 0 : -ENOEXEC;
                 }
 
                 if (!path_is_absolute(k)) {
-                        log_syntax(unit, LOG_ERR, filename, line, 0, "Working directory path '%s' is not absolute, ignoring.", rvalue);
-                        return 0;
+                        log_syntax(unit, LOG_ERR, filename, line, 0,
+                                   "Working directory path '%s' is not absolute%s.",
+                                   rvalue, missing_ok ? ", ignoring" : "");
+                        return missing_ok ? 0 : -ENOEXEC;
                 }
 
                 free(c->working_directory);
@@ -3925,8 +4063,11 @@ int unit_load_fragment(Unit *u) {
                         return r;
 
                 r = load_from_path(u, k);
-                if (r < 0)
+                if (r < 0) {
+                        if (r == -ENOEXEC)
+                                log_unit_notice(u, "Unit configuration has fatal error, unit will not be started.");
                         return r;
+                }
 
                 if (u->load_state == UNIT_STUB) {
                         SET_FOREACH(t, u->names, i) {

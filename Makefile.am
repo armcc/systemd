@@ -206,7 +206,8 @@ AM_CPPFLAGS = \
 	-DLIBDIR=\"$(libdir)\" \
 	-DROOTLIBDIR=\"$(rootlibdir)\" \
 	-DROOTLIBEXECDIR=\"$(rootlibexecdir)\" \
-	-DTEST_DIR=\"$(abs_top_srcdir)/test\" \
+	-DROOTHOMEDIR=\"$(roothomedir)\" \
+	-DTEST_DIR=\"$(testdir)/test\" \
 	-I $(top_srcdir)/src \
 	-I $(top_builddir)/src/basic \
 	-I $(top_srcdir)/src/basic \
@@ -247,7 +248,7 @@ define move-to-rootlibdir
 		$(MKDIR_P) $(DESTDIR)$(rootlibdir) && \
 		so_img_name=$$(readlink $(DESTDIR)$(libdir)/$$libname) && \
 		rm -f $(DESTDIR)$(libdir)/$$libname && \
-		$(LN_S) --relative -f $(DESTDIR)$(rootlibdir)/$$so_img_name $(DESTDIR)$(libdir)/$$libname && \
+		lnr $(DESTDIR)$(rootlibdir)/$$so_img_name $(DESTDIR)$(libdir)/$$libname && \
 		mv $(DESTDIR)$(libdir)/$$libname.* $(DESTDIR)$(rootlibdir); \
 	fi
 endef
@@ -321,7 +322,7 @@ define install-relative-aliases
 	while [ -n "$$1" ]; do \
 		$(MKDIR_P) `dirname $(DESTDIR)$$dir/$$2` && \
 		rm -f $(DESTDIR)$$dir/$$2 && \
-		$(LN_S) --relative $(DESTDIR)$$1 $(DESTDIR)$$dir/$$2 && \
+		lnr $(DESTDIR)$$1 $(DESTDIR)$$dir/$$2 && \
 		shift 2 || exit $$?; \
 	done
 endef
@@ -2906,7 +2907,7 @@ systemd_dbus1_generator_LDADD = \
 dbus1-generator-install-hook:
 	$(AM_V_at)$(MKDIR_P) $(DESTDIR)$(usergeneratordir)
 	$(AM_V_RM)rm -f $(DESTDIR)$(usergeneratordir)/systemd-dbus1-generator
-	$(AM_V_LN)$(LN_S) --relative -f $(DESTDIR)$(systemgeneratordir)/systemd-dbus1-generator $(DESTDIR)$(usergeneratordir)/systemd-dbus1-generator
+	$(AM_V_LN)lnr $(DESTDIR)$(systemgeneratordir)/systemd-dbus1-generator $(DESTDIR)$(usergeneratordir)/systemd-dbus1-generator
 
 dbus1-generator-uninstall-hook:
 	rm -f $(DESTDIR)$(usergeneratordir)/systemd-dbus1-generator
@@ -3705,6 +3706,18 @@ libudev_core_la_LIBADD = \
 	libshared.la \
 	$(BLKID_LIBS) \
 	$(KMOD_LIBS)
+
+libudev_core_la_CPPFLAGS = \
+	$(AM_CPPFLAGS) \
+	-DFIRMWARE_PATH="$(FIRMWARE_PATH)"
+
+if ENABLE_FIRMWARE
+libudev_core_la_SOURCES += \
+	src/udev/udev-builtin-firmware.c
+
+dist_udevrules_DATA += \
+	rules/50-firmware.rules
+endif
 
 if HAVE_KMOD
 libudev_core_la_SOURCES += \
@@ -4524,10 +4537,6 @@ INSTALL_DIRS += \
 	$(prefix)/lib/binfmt.d \
 	$(sysconfdir)/binfmt.d
 
-SYSINIT_TARGET_WANTS += \
-	systemd-binfmt.service \
-	proc-sys-fs-binfmt_misc.automount
-
 endif
 
 EXTRA_DIST += \
@@ -5004,6 +5013,7 @@ SYSTEM_UNIT_ALIASES += \
 BUSNAMES_TARGET_WANTS += \
 	org.freedesktop.machine1.busname
 
+if HAVE_MYHOSTNAME
 libnss_mymachines_la_SOURCES = \
 	src/nss-mymachines/nss-mymachines.sym \
 	src/nss-mymachines/nss-mymachines.c
@@ -5023,6 +5033,7 @@ libnss_mymachines_la_LIBADD = \
 lib_LTLIBRARIES += \
 	libnss_mymachines.la
 
+endif
 endif
 
 polkitpolicy_in_files += \
@@ -5863,6 +5874,7 @@ EXTRA_DIST += \
 substitutions = \
        '|rootlibexecdir=$(rootlibexecdir)|' \
        '|rootbindir=$(rootbindir)|' \
+       '|roothomedir=$(roothomedir)|' \
        '|bindir=$(bindir)|' \
        '|SYSTEMCTL=$(rootbindir)/systemctl|' \
        '|SYSTEMD_NOTIFY=$(rootbindir)/systemd-notify|' \

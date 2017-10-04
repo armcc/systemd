@@ -110,7 +110,23 @@ AC_PATH_PROG([SULOGIN], [sulogin], [/usr/sbin/sulogin], [$PATH:/usr/sbin:/sbin])
 AC_PATH_PROG([MOUNT_PATH], [mount], [/usr/bin/mount], [$PATH:/usr/sbin:/sbin])
 AC_PATH_PROG([UMOUNT_PATH], [umount], [/usr/bin/umount], [$PATH:/usr/sbin:/sbin])
 
-AS_IF([! ln --relative --help > /dev/null 2>&1], [AC_MSG_ERROR([*** ln doesn't support --relative ***])])
+# check for few functions not implemented in uClibc
+
+AC_CHECK_FUNCS_ONCE(mkostemp execvpe posix_fallocate)
+
+# check for %ms format support - assume always no if cross compiling
+
+AC_MSG_CHECKING([whether %ms format is supported by *scanf])
+
+AC_LINK_IFELSE(
+	[AC_LANG_PROGRAM([
+	 #include <stdio.h>
+	 ],[
+	    char *buf1, *buf2, *buf3, str="1 2.3 abcde" ;
+	    int rc = sscanf(str, "%ms %ms %ms", &buf1, &buf2, &buf3) ;
+	    return (rc==3)?0:1;])],
+	[AC_DEFINE([HAVE_MSFORMAT], [1], [Define if %ms format is supported by *scanf.])],
+	[AC_MSG_RESULT([no])])
 
 M4_DEFINES=
 
@@ -281,6 +297,7 @@ AM_CONDITIONAL([HAVE_PYTHON], [test "x$have_python" = "xyes"])
 
 # ------------------------------------------------------------------------------
 
+AC_CHECK_HEADERS([uchar.h], [], [])
 AC_CHECK_HEADERS([sys/capability.h], [], [AC_MSG_ERROR([*** POSIX caps headers not found])])
 AC_CHECK_HEADERS([linux/btrfs.h], [], [])
 AC_CHECK_HEADERS([linux/memfd.h], [], [])
@@ -1361,6 +1378,25 @@ AC_ARG_ENABLE(hwdb, [AC_HELP_STRING([--disable-hwdb], [disable hardware database
 AM_CONDITIONAL(ENABLE_HWDB, [test x$enable_hwdb = xyes])
 
 # ------------------------------------------------------------------------------
+AC_ARG_WITH(firmware-path,
+       AS_HELP_STRING([--with-firmware-path=DIR[[[:DIR[...]]]]],
+          [Firmware search path (default="")]),
+       [], [with_firmware_path=""])
+OLD_IFS=$IFS
+IFS=:
+for i in $with_firmware_path; do
+       if test "x${FIRMWARE_PATH}" = "x"; then
+              FIRMWARE_PATH="\\\"${i}/\\\""
+       else
+              FIRMWARE_PATH="${FIRMWARE_PATH}, \\\"${i}/\\\""
+       fi
+done
+IFS=$OLD_IFS
+AC_SUBST(FIRMWARE_PATH)
+AS_IF([test "x${FIRMWARE_PATH}" != "x"], [ AC_DEFINE(HAVE_FIRMWARE, 1, [Define if FIRMWARE is availabe]) ])
+AM_CONDITIONAL(ENABLE_FIRMWARE, [test "x${FIRMWARE_PATH}" != "x"])
+
+# ------------------------------------------------------------------------------
 have_manpages=no
 AC_ARG_ENABLE(manpages, AS_HELP_STRING([--disable-manpages], [disable manpages]))
 AC_PATH_PROG([XSLTPROC], [xsltproc])
@@ -1478,6 +1514,16 @@ AC_ARG_WITH([rootlibdir],
         [with_rootlibdir=${libdir}])
 AX_NORMALIZE_PATH([with_rootlibdir])
 
+AC_ARG_WITH([roothomedir],
+        AS_HELP_STRING([--with-roothomedir=DIR], [Home directory for the root user]),
+        [],
+        [with_roothomedir=/root])
+
+AC_ARG_WITH([testdir],
+        AS_HELP_STRING([--with-testdir=DIR], [test file directory]),
+        [],
+        [with_testdir=${abs_top_srcdir}])
+
 AC_ARG_WITH([pamlibdir],
         AS_HELP_STRING([--with-pamlibdir=DIR], [Directory for PAM modules]),
         [],
@@ -1562,6 +1608,8 @@ AC_SUBST([pamlibdir], [$with_pamlibdir])
 AC_SUBST([pamconfdir], [$with_pamconfdir])
 AC_SUBST([rootprefix], [$with_rootprefix])
 AC_SUBST([rootlibdir], [$with_rootlibdir])
+AC_SUBST([roothomedir], [$with_roothomedir])
+AC_SUBST([testdir], [$with_testdir])
 
 AC_CONFIG_FILES([
         Makefile
@@ -1653,9 +1701,14 @@ AC_MSG_RESULT([
         includedir:                        ${includedir}
         lib dir:                           ${libdir}
         rootlib dir:                       ${with_rootlibdir}
+        root home dir:                     ${with_roothomedir}
+        test dir:                          ${with_testdir}
         SysV init scripts:                 ${SYSTEM_SYSVINIT_PATH}
         SysV rc?.d directories:            ${SYSTEM_SYSVRCND_PATH}
         Build Python:                      ${PYTHON}
+        Installation Python:               ${PYTHON_BINARY}
+        sphinx binary:                     ${SPHINX_BUILD}
+        firmware path:                     ${FIRMWARE_PATH}
         PAM modules dir:                   ${with_pamlibdir}
         PAM configuration dir:             ${with_pamconfdir}
         D-Bus policy dir:                  ${with_dbuspolicydir}

@@ -35,7 +35,9 @@
 #include <stdlib.h>
 #include <sys/resource.h>
 #include <sys/syscall.h>
+#ifdef HAVE_UCHAR_H
 #include <uchar.h>
+#endif
 #include <unistd.h>
 
 #ifdef HAVE_AUDIT
@@ -488,12 +490,11 @@ struct btrfs_ioctl_quota_ctl_args {
 #ifndef MAX_HANDLE_SZ
 #define MAX_HANDLE_SZ 128
 #endif
-
 #ifndef HAVE_SECURE_GETENV
 #  ifdef HAVE___SECURE_GETENV
 #    define secure_getenv __secure_getenv
 #  else
-#    error "neither secure_getenv nor __secure_getenv are available"
+#    define secure_getenv getenv
 #  endif
 #endif
 
@@ -1012,5 +1013,10 @@ typedef int32_t key_serial_t;
 #endif
 
 #endif
+
+#ifdef __UCLIBC__
+/* 10^x = 10^(log e^x) = (e^x)^log10 = e^(x * log 10) */
+#define exp10(x) (exp((x) * log(10)))
+#endif /* __UCLIBC__ */
 
 #include "missing_syscall.h"

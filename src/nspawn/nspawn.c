@@ -121,6 +121,8 @@ typedef enum LinkJournal {
         LINK_GUEST
 } LinkJournal;
 
+#include "config.h"
+
 static char *arg_directory = NULL;
 static char *arg_template = NULL;
 static char *arg_chdir = NULL;
@@ -2739,7 +2741,7 @@ static int inner_child(
         if (envp[n_env])
                 n_env++;
 
-        if ((asprintf((char**)(envp + n_env++), "HOME=%s", home ? home: "/root") < 0) ||
+        if ((asprintf((char**)(envp + n_env++), "HOME=%s", home ? home: ROOTHOMEDIR) < 0) ||
             (asprintf((char**)(envp + n_env++), "USER=%s", arg_user ? arg_user : "root") < 0) ||
             (asprintf((char**)(envp + n_env++), "LOGNAME=%s", arg_user ? arg_user : "root") < 0))
                 return log_oom();
@@ -2812,11 +2814,16 @@ static int inner_child(
                 a[0] = (char*) "/sbin/init";
                 execve(a[0], a, env_use);
         } else if (!strv_isempty(arg_parameters))
+#ifdef HAVE_EXECVPE
                 execvpe(arg_parameters[0], arg_parameters, env_use);
+#else
+                environ = env_use;
+                execvp(arg_parameters[0], arg_parameters);
+#endif /* HAVE_EXECVPE */
         else {
                 if (!arg_chdir)
                         /* If we cannot change the directory, we'll end up in /, that is expected. */
-                        (void) chdir(home ?: "/root");
+                        (void) chdir(home ?: ROOTHOMEDIR);
 
                 execle("/bin/bash", "-bash", NULL, env_use);
                 execle("/bin/sh", "-sh", NULL, env_use);
